@@ -42,3 +42,47 @@ test('GET /metrics expose les métriques Prometheus', async () => {
     server.close();
   }
 });
+
+test('POST /api/tasks avec un titre trop long renvoie 400', async () => {
+  const server = app.listen(0);
+  const { port } = server.address();
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/api/tasks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'a'.repeat(101) }) });
+    assert.strictEqual(res.status, 400);
+  } finally {
+    server.close();
+  }
+});
+
+test('POST /api/tasks avec un titre non-texte renvoie 400', async () => {
+  const server = app.listen(0);
+  const { port } = server.address();
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/api/tasks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 123 }) });
+    assert.strictEqual(res.status, 400);
+  } finally {
+    server.close();
+  }
+});
+
+test('GET /api/tasks/abc renvoie 400', async () => {
+  const server = app.listen(0);
+  const { port } = server.address();
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/api/tasks/abc`);
+    assert.strictEqual(res.status, 400);
+  } finally {
+    server.close();
+  }
+});
+
+test('PUT /api/tasks/1 avec done non booléen renvoie 400', async () => {
+  const server = app.listen(0);
+  const { port } = server.address();
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/api/tasks/1`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ done: 'oui' }) });
+    assert.strictEqual(res.status, 400);
+  } finally {
+    server.close();
+  }
+});
