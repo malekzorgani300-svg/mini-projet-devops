@@ -15,6 +15,24 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ---------- Validation ----------
+const MAX_TITLE = 100;
+
+function validateTitle(value) {
+  if (typeof value !== 'string') return 'Le titre doit être une chaîne de caractères';
+  const title = value.trim();
+  if (!title) return 'Le titre est obligatoire';
+  if (title.length > MAX_TITLE) return `Le titre ne doit pas dépasser ${MAX_TITLE} caractères`;
+  return null;
+}
+
+function validateId(req, res, next) {
+  if (!/^\d+$/.test(req.params.id)) {
+    return res.status(400).json({ error: "L'identifiant doit être un nombre" });
+  }
+  next();
+}
+
 // ---------- Métriques Prometheus (bonus monitoring) ----------
 client.collectDefaultMetrics();
 const httpDuration = new client.Histogram({
@@ -53,8 +71,9 @@ app.get('/api/health/db', async (req, res) => {
 // ---------- CRUD tâches ----------
 // Create
 app.post('/api/tasks', async (req, res) => {
-  const title = (req.body.title || '').trim();
-  if (!title) return res.status(400).json({ error: 'Le titre est obligatoire' });
+  const error = validateTitle(req.body.title);
+  if (error) return res.status(400).json({ error });
+  const title = req.body.title.trim();
   try {
     const { rows } = await pool.query(
       'INSERT INTO tasks (title) VALUES ($1) RETURNING *',
@@ -77,7 +96,7 @@ app.get('/api/tasks', async (req, res) => {
 });
 
 // Read (une tâche)
-app.get('/api/tasks/:id', async (req, res) => {
+app.get('/api/tasks/:id', validateId, async (req, res) => {
   try {
     const { rows } = await pool.query('SELECT * FROM tasks WHERE id = $1', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Tâche introuvable' });
@@ -88,14 +107,21 @@ app.get('/api/tasks/:id', async (req, res) => {
 });
 
 // Update
-app.put('/api/tasks/:id', async (req, res) => {
+app.put('/api/tasks/:id', validateId, async (req, res) => {
   const { title, done } = req.body;
+  if (title !== undefined) {
+    const error = validateTitle(title);
+    if (error) return res.status(400).json({ error });
+  }
+  if (done !== undefined && typeof done !== 'boolean') {
+    return res.status(400).json({ error: 'Le champ done doit être un booléen' });
+  }
   try {
     const { rows } = await pool.query(
       `UPDATE tasks
        SET title = COALESCE($1, title), done = COALESCE($2, done)
        WHERE id = $3 RETURNING *`,
-      [title !== undefined ? String(title).trim() : null, done !== undefined ? Boolean(done) : null, req.params.id]
+      [title !== undefined ? title.trim() : null, done !== undefined ? done : null, req.params.id]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Tâche introuvable' });
     res.json(rows[0]);
@@ -105,7 +131,7 @@ app.put('/api/tasks/:id', async (req, res) => {
 });
 
 // Delete
-app.delete('/api/tasks/:id', async (req, res) => {
+app.delete('/api/tasks/:id', validateId, async (req, res) => {
   try {
     const { rowCount } = await pool.query('DELETE FROM tasks WHERE id = $1', [req.params.id]);
     if (rowCount === 0) return res.status(404).json({ error: 'Tâche introuvable' });
