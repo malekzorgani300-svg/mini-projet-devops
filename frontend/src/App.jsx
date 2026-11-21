@@ -8,6 +8,7 @@ export default function App() {
   const [editingId, setEditingId] = useState(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [error, setError] = useState('');
+  const [filter, setFilter] = useState('all');
 
   async function load() {
     try {
@@ -63,6 +64,11 @@ export default function App() {
   }
 
   const remaining = tasks.filter((t) => !t.done).length;
+  const visibleTasks = tasks.filter((t) => {
+    if (filter === 'todo') return !t.done;
+    if (filter === 'done') return t.done;
+    return true;
+  });
 
   return (
     <main className="container">
@@ -83,8 +89,20 @@ export default function App() {
 
       {error && <p className="error">{error}</p>}
 
+      <div className="filters">
+        <button className={filter === 'all' ? '' : 'secondary'} onClick={() => setFilter('all')}>
+          Toutes
+        </button>
+        <button className={filter === 'todo' ? '' : 'secondary'} onClick={() => setFilter('todo')}>
+          À faire
+        </button>
+        <button className={filter === 'done' ? '' : 'secondary'} onClick={() => setFilter('done')}>
+          Terminées
+        </button>
+      </div>
+
       <ul className="task-list">
-        {tasks.map((task) => (
+        {visibleTasks.map((task) => (
           <li key={task.id} className={task.done ? 'done' : ''}>
             <input
               type="checkbox"
